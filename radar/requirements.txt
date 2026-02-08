@@ -1,0 +1,3 @@
+numpy
+opencv-python
+# ROS2 相关依赖（rclpy、cv_bridge 等）由ROS环境提供

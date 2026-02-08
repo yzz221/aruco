@@ -1,0 +1,105 @@
+# ROS2参数配置 - RM透视投影系统（简化测试版）
+# 场景：Lidar和Camera假设重合，无base_link，相机第一帧作为odom原点
+
+# ========================================
+# pointlio_to_projection_node 参数
+# ========================================
+pointlio_to_projection_node:
+  ros__parameters:
+    # T_R_A0变换矩阵文件路径
+    # 这是从 B_board.py 标定得到的 T_B_to_A.txt
+    # 表示：雷达站R → 相机初始系A0 的变换
+    T_R_A0_file: "T_B_to_A.txt"
+    
+    # Point-LIO里程计话题
+    # Point-LIO发布的是 base_link 在 odom 系的位姿
+    # 简化场景下，直接当作 Lidar/Camera 的位姿
+    odometry_topic: "/Odometry"
+    
+    # 是否发布 pA（我方在雷达系的位置）
+    # 可选功能，用于可视化/调试
+    publish_pA: true
+
+  # 里程计轴系与相机轴系不一致时的修正
+  # 里程计(或Lidar): x前、y左、z上
+  # 相机: x右、y下、z前
+  apply_odom_to_camera_axis: true
+  odom_axes: "x_forward_y_left_z_up"
+  camera_axes: "x_right_y_down_z_forward"
+
+  # 调试：只保留yaw，忽略roll/pitch
+  # 用于判断旋转误差是否来自IMU或外参
+  use_yaw_only: true
+  # 固定外参旋转（相机相对雷达/里程计）
+  # 先做轴映射，再施加该旋转（XYZ顺序，单位度）
+  apply_camera_extrinsic: false
+  camera_extrinsic_rpy_deg: [0.0, 0.0, 0.0]
+
+# ========================================
+# projection_node 参数（简化版）
+# ========================================
+projection_node:
+  ros__parameters:
+    # 输入话题
+    pB_topic: "/pB"              # 敌方位置（雷达系）
+    T_R_At_topic: "/T_R_At"      # 我方相机在雷达系的完整位姿（4×4变换）
+    
+    # 变换消息类型
+    # "transform" - TransformStamped（四元数+平移）
+    # "array"     - Float32MultiArray（16个浮点数，4×4矩阵）
+    transform_msg_type: "transform"
+    
+    # 时间同步参数
+    queue_size: 10              # 消息队列大小
+    slop: 0.05                  # 时间同步容差（秒）
+                                # 如果消息不同步，可以增大此值，例如 0.1 或 0.2
+    
+    # 输出话题
+    publish_topic: "/projected_pixel"
+    
+    # ========================================
+    # 相机内参（从 A_board.py 获取）
+    # ========================================
+    # 注意：这些参数目前硬编码在 core2_5ros_SIMPLE.py 中
+    # 如果需要通过参数配置，需要修改代码添加参数读取
+    # 
+    # 当前使用的内参值：
+    # fx: 5098.552362394264
+    # fy: 5100.636301704550
+    # cx: 2722.933231734429
+    # cy: 1796.537786961445
+    # distortion: [-0.049667314236302, 0.123240393631215, 0, 0, 0]
+
+# ========================================
+# projected_pixel_overlay_node 参数
+# ========================================
+projected_pixel_overlay_node:
+  ros__parameters:
+    image_topic: "/camera/image_raw"   # 海康USB相机图像话题（按实际情况改）
+    pixel_topic: "/projected_pixel"    # 投影像素话题
+    output_topic: "/projected_image"   # 叠加后的图像话题
+    queue_size: 10
+    slop: 0.05
+    draw_radius: 6
+    draw_thickness: 2
+    draw_color_bgr: [0, 0, 255]         # 红色圆点（BGR）
+    text_color_bgr: [0, 255, 0]         # 绿色文字（BGR）
+    font_scale: 0.7
+    draw_depth_text: true
+    show_window: true                  # 需要本地显示时改为 true
+    window_name: "Projected Pixel Overlay"
+
+# ========================================
+# hikvision_mvs_camera_node 参数
+# ========================================
+hikvision_mvs_camera_node:
+  ros__parameters:
+    mvs_python_path: "/opt/MVS/Samples/64/Python"
+    device_index: 0
+    image_topic: "/camera/image_raw"
+    frame_id: "camera"
+    grab_timeout_ms: 1000
+    publish_rate_hz: 0.0
+    enable_trigger: false
+    exposure_time_us: 0.0
+    gain: 0.0
